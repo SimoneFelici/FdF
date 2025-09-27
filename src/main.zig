@@ -2,13 +2,31 @@ const std = @import("std");
 const c = @cImport({
     @cInclude("SDL3/SDL.h");
 });
+const dir = std.fs.cwd();
 
 const Width = 640;
 const Height = 480;
 
 pub fn main() !void {
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+    var arena_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const args = try std.process.argsAlloc(arena);
+    defer std.process.argsFree(arena, args);
+
+    if (args.len != 2) {
+        std.debug.print("Wrong number of arguments\n", .{});
+        std.process.exit(1);
+    }
+    const data = try std.fs.cwd().readFileAlloc(arena, args[1], 8 * 1024 * 1024);
+    try stdout.print("File content:\n{s}\n", .{data});
+    try stdout.flush();
+
     if (!c.SDL_Init(c.SDL_INIT_VIDEO)) {
-        std.debug.print("SDL_Init failed: {s}\n", .{c.SDL_GetError()});
+        std.debug.print("SDL_Init failed: {s}\n", .{c.SDL_GetError().?});
         return error.SDLInitFailed;
     }
     defer c.SDL_Quit();
